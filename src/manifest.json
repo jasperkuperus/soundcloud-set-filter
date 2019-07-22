@@ -2,6 +2,12 @@
   "manifest_version": 2,
   "name": "SoundCloud set filter",
   "version": "0.1",
+  "permissions": [
+    "background",
+    "webRequest",
+    "*://soundcloud.com/",
+    "*://api-v2.soundcloud.com/stream"
+  ],
   "content_scripts": [
     {
       "matches": [
@@ -9,5 +15,8 @@
       ],
       "js": ["jquery-3.4.1.min.js", "content.js"]
     }
-  ]
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  }
 }
