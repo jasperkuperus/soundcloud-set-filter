@@ -23,11 +23,45 @@ function plugin() {
           xhrHandler(JSON.parse(this.response));
         }
       });
+
       return send.apply(this, arguments);
     };
   })();
 
-  // TODO: Re-do the first XHR if we did not get it...
+  /**
+   * Perform the initial SoundCloud stream request, as we sometimes
+   * miss it due to our late injection by Google Chrome.
+   */
+  (function performFirstStreamRequest() {
+    // Grab some secret values in order to send the HTTP request
+    const sc_a_id = JSON.parse(window.localStorage.getItem('V2::local::promoted-persistent'))
+    const authToken = decodeURIComponent(RegExp('oauth_token[^;]+').exec(document.cookie)).split('=')[1];
+    const userId = authToken.split('-')[2];
+
+    fetch([
+      'https://api-v2.soundcloud.com/stream',
+      `?sc_a_id=${sc_a_id}`,
+      '&device_locale=en',
+      '&variant_ids=',
+      `&user_urn=soundcloud%3Ausers%3A${userId}`,
+      '&promoted_playlist=true',
+      '&client_id=7GggXaGxcUUvedkWCEYGyeI2qbWpiXLV',
+      '&limit=10',
+      '&offset=0',
+      '&linked_partitioning=1',
+      '&app_version=1565604047',
+      '&app_locale=en',
+    ].join(''), {
+      method: 'GET',
+      headers: {
+        Authorization: `OAuth ${authToken}`,
+      },
+    }).then((response) => {
+      return response.json();
+    }).then((json) => {
+      xhrHandler(json);
+    });
+  })();
 
   // Threshold in minutes before we consider it a DJ set in minutes
   const djSetThreshold = 15;
