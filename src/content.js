@@ -13,7 +13,7 @@ function plugin() {
     var open = XHR.open;
 
     XHR.open = function(method, url) {
-      this.url = url; // the request url
+      this.url = url;
       return open.apply(this, arguments);
     }
 
@@ -27,11 +27,57 @@ function plugin() {
     };
   })();
 
+  // TODO: Re-do the first XHR if we did not get it...
+
+  // Threshold in minutes before we consider it a DJ set in minutes
+  const djSetThreshold = 15;
+
+  // Keep data stored here
+  let stream = [];
+
   /**
-   * Handles new incoming XHR data.
+   * Checks whether an item in the stream contains a DJ set. Checks
+   * whether the item (or an item in a playlist) has a duration that
+   * exceeds the threshold.
+   */
+  function analyzeItem(item) {
+    let actualitem = null;
+    let isDJSet = false;
+
+    if (['track', 'track-repost'].includes(item.type)) {
+      // Single track, just check the duration
+      isDJSet = (item.track.duration / 1000 / 60) > djSetThreshold;
+      actualitem = item.track;
+    } else if (['playlist', 'playlist-repost'].includes(item.type)) {
+      // Playlist, check if there is at least 1 track
+      actualitem = item.playlist
+      for (const track of item.playlist.tracks) {
+        isDJSet = isDJSet || (track.duration / 1000 / 60) > djSetThreshold;
+      }
+    }
+
+    return {
+      item: actualitem,
+      isDJSet,
+    };
+  }
+
+  /**
+   * Handles new incoming XHR data. Append the data, loop through
+   * the items in the result.
    */
   function xhrHandler(data) {
-    console.log('Handling XHR!', data);
+    stream = stream.concat(data.collection);
+    console.log(stream);
+
+    // Check what to hide/show
+    stream.forEach((item) => {
+      const analyzedItem = analyzeItem(item);
+      if (!analyzedItem.isDJSet) {
+        const domNode = document.evaluate(`//li[contains(@class, "soundList__item") and descendant::span[text()="${analyzedItem.item.title}"]]`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        domNode.style.opacity = 0.25;
+      }
+    });
   }
 }
 
