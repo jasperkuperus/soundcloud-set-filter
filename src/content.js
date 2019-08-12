@@ -32,8 +32,8 @@ function plugin() {
   // Threshold in minutes before we consider it a DJ set in minutes
   const djSetThreshold = 15;
 
-  // Keep data stored here
-  let stream = [];
+  // Keep data stored here ({ uuid => item } lookup)
+  const stream = {};
 
   /**
    * Checks whether an item in the stream contains a DJ set. Checks
@@ -67,13 +67,19 @@ function plugin() {
    * the items in the result.
    */
   function xhrHandler(data) {
-    stream = stream.concat(data.collection);
-    console.log(stream);
+    // Create a `{ uuid => item }` lookup and merge it into the stream,
+    // this helps prevent duplicates / unnecessary DOM manipulation
+    const lookup = data.collection.reduce((accumulator, current) => {
+      accumulator[current.uuid] = current;
+      return accumulator;
+    }, {});
+    Object.assign(stream, lookup)
 
     // Check what to hide/show
-    stream.forEach((item) => {
+    Object.values(stream).forEach((item) => {
       const analyzedItem = analyzeItem(item);
       if (!analyzedItem.isDJSet) {
+        // Use some XPath magic to dim the non DJ sets
         const domNode = document.evaluate(`//li[contains(@class, "soundList__item") and descendant::span[text()="${analyzedItem.item.title}"]]`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
         domNode.style.opacity = 0.25;
       }
