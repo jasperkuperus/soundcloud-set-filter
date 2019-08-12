@@ -11,7 +11,7 @@
       "matches": [
         "https://soundcloud.com/stream"
       ],
-      "js": ["jquery-3.4.1.min.js", "content.js"],
+      "js": ["content.js"],
       "run_at": "document_start"
     }
   ],
