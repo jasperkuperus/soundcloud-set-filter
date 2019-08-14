@@ -61,7 +61,10 @@ function plugin() {
     }).then((response) => {
       return response.json();
     }).then((json) => {
-      xhrHandler(json);
+      // Allow the DOM to render before handing the data to the handler
+      requestIdleCallback(() => {
+        xhrHandler(json);
+      });
     });
   })();
 
