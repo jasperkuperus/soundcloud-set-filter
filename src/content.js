@@ -112,10 +112,25 @@ function plugin() {
     // Check what to hide/show
     Object.values(stream).forEach((item) => {
       const analyzedItem = analyzeItem(item);
-      if (!analyzedItem.isDJSet) {
+      if (!analyzedItem.isDJSet && !item.isInitialized) {
         // Use some XPath magic to dim the non DJ sets
-        const domNode = document.evaluate(`//li[contains(@class, "soundList__item") and descendant::span[text()="${analyzedItem.item.title}"]]`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-        domNode.style.opacity = 0.25;
+        const itemDOMNode = document.evaluate(`//li[contains(@class, "soundList__item") and descendant::span[text()="${analyzedItem.item.title}"]]`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        itemDOMNode.style.opacity = 0.25;
+
+        // Hide the body of the node
+        const bodyDOMNode = itemDOMNode.getElementsByClassName('sound__body')[0]
+        bodyDOMNode.style.display = 'none';
+
+        // Make title clickable to toggle this item
+        const titleDOMNode = itemDOMNode.getElementsByClassName('soundContext')[0]
+        titleDOMNode.style.cursor = 'pointer';
+        titleDOMNode.addEventListener('click', () => {
+          bodyDOMNode.style.display = (bodyDOMNode.style.display === 'none' ? 'flex' : 'none');
+          itemDOMNode.style.opacity = (itemDOMNode.style.opacity === '0.25' ? 0.75 : 0.25);
+        });
+
+        // Mark item as initialized
+        item.isInitialized = true;
       }
     });
   }
