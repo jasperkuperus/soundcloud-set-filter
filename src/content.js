@@ -1,11 +1,10 @@
 /**
- * Contains the plugin code that will be injected in the page by
- * the `injectPlugin` code.
+ * Contains the plugin code that will be injected by `injectPlugin`.
  */
 function plugin() {
   /**
-   * Initializes the XHR interceptor. Overrides the XMLHttpRequest and
-   * correctly calls the handler.
+   * Initializes the XHR interceptor, overriding XMLHttpRequest and
+   * add a call to `xhrHandler` on response.
    */
   (function initXHRInterceptor() {
     var XHR = XMLHttpRequest.prototype;
@@ -29,11 +28,14 @@ function plugin() {
   })();
 
   /**
-   * Perform the initial SoundCloud stream request, as we sometimes
-   * miss it due to our late injection by Google Chrome.
+   * Due to late injection by Google Chrome, sometimes this code runs
+   * after the first XHR for the stream has already returned. That way
+   * we miss the first results. This method performs the first stream
+   * request manually, making sure our code handles the first page of
+   * the stream.
    */
   (function performFirstStreamRequest() {
-    // Grab some secret values in order to send the HTTP request
+    // Grab some secret tokens to perform the HTTP request
     const sc_a_id = JSON.parse(window.localStorage.getItem('V2::local::promoted-persistent'))
     const authToken = decodeURIComponent(RegExp('oauth_token[^;]+').exec(document.cookie)).split('=')[1];
     const userId = authToken.split('-')[2];
@@ -64,15 +66,16 @@ function plugin() {
   })();
 
   // Threshold in minutes before we consider it a DJ set in minutes
+  // TODO: Make configurable
   const djSetThreshold = 15;
 
-  // Keep data stored here ({ uuid => item } lookup)
+  // Keep data stored here ({ uuid => { item, isInitialized } lookup)
   const stream = {};
 
   /**
-   * Checks whether an item in the stream contains a DJ set. Checks
-   * whether the item (or an item in a playlist) has a duration that
-   * exceeds the threshold.
+   * Checks whether an item in the stream contains a DJ set. Either the
+   * track, or one or more tracks in a playlist should exceed the duration
+   * threshold. Returns also the actual object (`playlist` or `track`).
    */
   function analyzeItem(item) {
     let actualitem = null;
@@ -97,23 +100,27 @@ function plugin() {
   }
 
   /**
-   * Handles new incoming XHR data. Append the data, loop through
-   * the items in the result.
+   * Handles incoming XHR responses. Merges the data into `stream`.
+   * Then, loops through the items and hides everything that isn't
+   * a DJ set and adds a click handler to allow toggling it.
    */
   function xhrHandler(data) {
-    // Create a `{ uuid => item }` lookup and merge it into the stream,
-    // this helps prevent duplicates / unnecessary DOM manipulation
+    // Create a lookup and merge it into the stream, this helps prevent
+    // duplicates / unnecessary DOM manipulation
     const lookup = data.collection.reduce((accumulator, current) => {
-      accumulator[current.uuid] = current;
+      accumulator[current.uuid] = {
+        item: current,
+        isInitialized: false,
+      };
       return accumulator;
     }, {});
     Object.assign(stream, lookup)
 
     // Check what to hide/show
-    Object.values(stream).forEach((item) => {
-      const analyzedItem = analyzeItem(item);
-      if (!analyzedItem.isDJSet && !item.isInitialized) {
-        // Use some XPath magic to dim the non DJ sets
+    Object.values(stream).forEach((streamItem) => {
+      const analyzedItem = analyzeItem(streamItem.item);
+      if (!analyzedItem.isDJSet && !streamItem.isInitialized) {
+        // Use some XPath magic to find the parent DOM node
         const itemDOMNode = document.evaluate(`//li[contains(@class, "soundList__item") and descendant::span[text()="${analyzedItem.item.title}"]]`, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
         itemDOMNode.style.opacity = 0.25;
 
@@ -130,7 +137,7 @@ function plugin() {
         });
 
         // Mark item as initialized
-        item.isInitialized = true;
+        streamItem.isInitialized = true;
       }
     });
   }
@@ -138,8 +145,8 @@ function plugin() {
 
 
 /**
- * Injects the plugin code into the DOM. When `head` is ready,
- * inject the `script` tag with the contents of our plugin function.
+ * When `head` is ready, inject the plugin as a `script` tag containing
+ * the code for the `plugin` function.
  */
 (function injectPlugin() {
   if (document.body && document.head) {
